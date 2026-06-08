@@ -1,0 +1,487 @@
+# ==== Imports ==== #
+import threading
+from pathlib import Path
+
+import flet as ft
+
+from config import (
+    APP_NAME,
+    APP_VERSION,
+    LANGUAGES,
+)
+from core.scanner import detect_installations, find_community_folder, list_addons
+from core.analyzer import analyze_addon
+from os_services.symlinks import find_broken_symlinks
+from os_services.event_logs import get_msfs_events
+from settings import load_settings, save_settings
+
+# ==== Main App ==== #
+class MSFSDiagApp:
+
+    def __init__(self, page: ft.Page):
+        self.page              = page
+        settings               = load_settings()
+        self.current_lang_code = settings["language"]
+        self.current_theme     = settings["theme"]
+        self.lang              = LANGUAGES[self.current_lang_code]
+        
+        # Filtro ativo para a lista de Add-ons
+        # Opções: "all", "valid", "invalid", "no_manifest", "no_layout", "invalid_json", "missing_fields"
+        self.current_filter    = "all" 
+        
+        self.installs          = detect_installations()
+        self.install           = self.installs[0] if self.installs else None
+
+        if self.install:
+            self.install.community_folder = find_community_folder(self.install)
+
+        self._setup_page()
+        self._build_ui()
+
+    # ==== Page Setup ==== #
+    def _setup_page(self):
+        self.page.title         = APP_NAME
+        self.page.theme_mode    = ft.ThemeMode.LIGHT if self.current_theme == "light" else ft.ThemeMode.DARK
+        self.page.window.width  = 1100
+        self.page.window.height = 700
+        self.page.padding       = 0
+        self.page.window.icon   = str(Path(__file__).parent.parent.parent / "assets" / "MSFSDiag.ico")
+
+    # ==== UI Builder ==== #
+    def _build_ui(self):
+        self.page.controls.clear()
+        self.page.add(
+            ft.Row(
+                controls=[
+                    self._build_sidebar(),
+                    self._build_content(),
+                    self._build_detail_panel(),
+                ],
+                expand=True,
+            )
+        )
+        self.page.update()
+
+    # ==== Sidebar ==== #
+    def _build_sidebar(self) -> ft.Container:
+        nav_buttons = [
+            ("🏠", "tab_dashboard"),
+            ("🧩", "tab_addons"),
+            ("📋", "tab_eventlogs"),
+            ("🔗", "tab_symlinks"),
+            ("⚙️", "tab_settings"),
+        ]
+
+        buttons: list[ft.Control] = [
+            ft.TextButton(
+                content=ft.Row([
+                    ft.Text(icon, size=18),
+                    ft.Text(self.lang[key], size=14),
+                ]),
+                on_click=lambda e, k=key: self._switch_tab(k),
+            )
+            for icon, key in nav_buttons
+        ]
+
+        return ft.Container(
+            content=ft.Column(controls=buttons, spacing=4),
+            width=220,
+            padding=16,
+            bgcolor="#1e1e2e",
+        )
+
+    # ==== Content Panel ==== #
+    def _build_content(self) -> ft.Container:
+        self.content_area = ft.Column(
+            controls=[],
+            expand=True,
+            scroll=ft.ScrollMode.AUTO,
+        )
+
+        return ft.Container(
+            content=self.content_area,
+            expand=True,
+            padding=16,
+        )
+
+    # ==== Detail Panel ==== #
+    def _build_detail_panel(self) -> ft.Container:
+        self.detail_area = ft.Column(
+            controls=[
+                ft.Text(
+                    "Select an item to see details.",
+                    size=13,
+                    color="#888888",
+                ),
+            ],
+            scroll=ft.ScrollMode.AUTO,
+        )
+
+        return ft.Container(
+            content=self.detail_area,
+            width=250,
+            padding=16,
+            bgcolor="#1e1e2e",
+        )
+
+    # ==== Tab Switching ==== #
+    def _switch_tab(self, tab_key: str):
+        self.content_area.controls.clear()
+        self.detail_area.controls.clear()
+
+        if tab_key == "tab_dashboard":
+            self._show_dashboard()
+        elif tab_key == "tab_addons":
+            self._show_addons()
+        elif tab_key == "tab_eventlogs":
+            self._show_eventlogs()
+        elif tab_key == "tab_symlinks":
+            self._show_symlinks()
+        elif tab_key == "tab_settings":
+            self._show_settings()
+
+        self.content_area.update()
+        self.page.update()
+
+    # ==== Dashboard View ==== #
+    def _show_dashboard(self):
+        version   = self.install.version if self.install else self.lang["not_detected"]
+        community = str(self.install.community_folder) if self.install and self.install.community_folder else self.lang["not_detected"]
+
+        self.content_area.controls.extend([
+            ft.Text(self.lang["tab_dashboard"], size=24, weight=ft.FontWeight.BOLD),
+            ft.Divider(),
+            ft.Text(f"{self.lang['msfs_version']}: {version}", size=14),
+            ft.Text(f"{self.lang['community_path']}: {community}", size=14),
+            ft.ElevatedButton(
+                self.lang["run_diagnostic"],
+                on_click=lambda e: self._run_diagnostic(),
+            ),
+        ])
+
+    # ==== Addons View ==== #
+    def _show_addons(self):
+        self.content_area.controls.append(
+            ft.Text(self.lang["tab_addons"], size=24, weight=ft.FontWeight.BOLD)
+        )
+        
+        # Grid Avançado de Botões de Filtro (com wrap=True para não quebrar o layout)
+        self.content_area.controls.append(
+            ft.Row([
+                ft.ElevatedButton(
+                    "All",
+                    on_click=lambda e: self._set_addon_filter("all"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "all" else None),
+                ),
+                ft.ElevatedButton(
+                    "Valid ✅",
+                    on_click=lambda e: self._set_addon_filter("valid"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "valid" else None),
+                ),
+                ft.ElevatedButton(
+                    "Invalid ❌",
+                    on_click=lambda e: self._set_addon_filter("invalid"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "invalid" else None),
+                ),
+                ft.ElevatedButton(
+                    "No Manifest 📄",
+                    on_click=lambda e: self._set_addon_filter("no_manifest"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "no_manifest" else None),
+                ),
+                ft.ElevatedButton(
+                    "No Layout 🗺️",
+                    on_click=lambda e: self._set_addon_filter("no_layout"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "no_layout" else None),
+                ),
+                ft.ElevatedButton(
+                    "Bad JSON ⚙️",
+                    on_click=lambda e: self._set_addon_filter("invalid_json"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "invalid_json" else None),
+                ),
+                ft.ElevatedButton(
+                    "Missing Fields 📝",
+                    on_click=lambda e: self._set_addon_filter("missing_fields"),
+                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "missing_fields" else None),
+                ),
+            ], spacing=8, wrap=True)
+        )
+
+        self.content_area.controls.append(ft.Divider())
+
+        if not self.install or not self.install.community_folder:
+            self.content_area.controls.append(
+                ft.Text(self.lang["not_detected"], size=14)
+            )
+            return
+
+        addons = list_addons(self.install.community_folder)
+
+        if not addons:
+            self.content_area.controls.append(
+                ft.Text(self.lang["no_addons"], size=14)
+            )
+            return
+
+        for addon_path in addons:
+            report = analyze_addon(addon_path)
+            is_valid = not report.invalid_json and not report.missing_fields
+            status = "✅" if is_valid else "❌"
+
+            # ==== Super Lógica Avançada de Filtragem ====
+            if self.current_filter == "valid" and not is_valid:
+                continue
+            elif self.current_filter == "invalid" and is_valid:
+                continue
+            elif self.current_filter == "no_manifest" and report.has_manifest:
+                continue
+            elif self.current_filter == "no_layout" and report.has_layout:
+                continue
+            elif self.current_filter == "invalid_json" and not report.invalid_json:
+                continue
+            elif self.current_filter == "missing_fields" and not report.missing_fields:
+                continue
+            # ============================================
+
+            self.content_area.controls.append(
+                ft.TextButton(
+                    content=ft.Row([
+                        ft.Text(status, size=16),
+                        ft.Text(report.addon_name, size=14),
+                    ]),
+                    on_click=lambda e, r=report: self._show_addon_detail(r),
+                )
+            )
+
+    # Método para gerir a alteração e atualização dos filtros
+    def _set_addon_filter(self, filter_type: str):
+        self.current_filter = filter_type
+        self.content_area.controls.clear()
+        self.detail_area.controls.clear()
+        self._show_addons()
+        self.content_area.update()
+        self.detail_area.update()
+
+    # ==== Event Logs View ==== #
+    def _show_eventlogs(self):
+        self.content_area.controls.append(
+            ft.Text(self.lang["tab_eventlogs"], size=24, weight=ft.FontWeight.BOLD)
+        )
+        self.content_area.controls.append(ft.Divider())
+
+        events = get_msfs_events()
+
+        if not events:
+            self.content_area.controls.append(
+                ft.Text(self.lang["no_events"], size=14)
+            )
+            return
+
+        for event in events:
+            self.content_area.controls.append(
+                ft.TextButton(
+                    content=ft.Row([
+                        ft.Text(str(event.event_id), size=12, width=60),
+                        ft.Text(event.source, size=12, expand=True),
+                        ft.Text(str(event.timestamp.date())),
+                    ]),
+                    on_click=lambda e, ev=event: self._show_event_detail(ev),
+                )
+            )
+
+    # ==== Symlinks View ==== #
+    def _show_symlinks(self):
+        self.content_area.controls.append(
+            ft.Text(self.lang["tab_symlinks"], size=24, weight=ft.FontWeight.BOLD)
+        )
+        self.content_area.append(ft.Divider())
+        self.content_area.controls.append(
+            ft.Text("Scanning...", size=14, color="#888888")
+        )
+        self.content_area.update()
+
+        if not self.install or not self.install.community_folder:
+            self.content_area.controls.clear()
+            self.content_area.controls.append(
+                ft.Text(self.lang["not_detected"], size=14)
+            )
+            self.content_area.update()
+            return
+
+        def scan():
+            try:
+                broken = find_broken_symlinks(self.install.community_folder)
+                self.content_area.controls.clear()
+                self.content_area.controls.append(
+                    ft.Text(self.lang["tab_symlinks"], size=24, weight=ft.FontWeight.BOLD)
+                )
+                self.content_area.controls.append(ft.Divider())
+
+                if not broken:
+                    self.content_area.controls.append(
+                        ft.Text(self.lang["no_symlinks"], size=14, color="#00ff00")
+                    )
+                else:
+                    for path in broken:
+                        self.content_area.controls.append(
+                            ft.Row([
+                                ft.Text("🔗❌", size=16),
+                                ft.Text(str(path), size=12, expand=True),
+                            ])
+                        )
+            except Exception as ex:
+                self.content_area.controls.append(
+                    ft.Text(f"Error: {ex}", size=14, color="#ff5555")
+                )
+            finally:
+                self.content_area.update()
+                self.page.update()
+
+        threading.Thread(target=scan, daemon=True).start()
+
+    # ==== Settings View ==== #
+    def _show_settings(self):
+        readme_content  = ""
+        license_content = ""
+
+        try:
+            readme_content = (Path(__file__).parent.parent.parent / "README.md").read_text(encoding="utf-8")
+        except OSError:
+            readme_content = "README.md not found."
+
+        try:
+            license_content = (Path(__file__).parent.parent.parent / "LICENSE").read_text(encoding="utf-8")
+        except OSError:
+            license_content = "LICENSE not found."
+
+        self.content_area.controls.extend([
+            ft.Text(self.lang["tab_settings"], size=24, weight=ft.FontWeight.BOLD),
+            ft.Divider(),
+            ft.Row([
+                ft.ElevatedButton(
+                    "README",
+                    on_click=lambda e: self._show_text_dialog("README", readme_content),
+                ),
+                ft.ElevatedButton(
+                    "LICENSE",
+                    on_click=lambda e: self._show_text_dialog("LICENSE", license_content),
+                ),
+            ]),
+            ft.Divider(),
+            ft.Text(self.lang["theme"], size=16, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.ElevatedButton(
+                    self.lang["light"],
+                    on_click=lambda e: self._set_theme("light"),
+                    style=ft.ButtonStyle(
+                        bgcolor="#444444" if self.current_theme == "light" else None,
+                    ),
+                ),
+                ft.ElevatedButton(
+                    self.lang["dark"],
+                    on_click=lambda e: self._set_theme("dark"),
+                    style=ft.ButtonStyle(
+                        bgcolor="#444444" if self.current_theme == "dark" else None,
+                    ),
+                ),
+            ]),
+            ft.Divider(),
+            ft.Text(self.lang["language"], size=16, weight=ft.FontWeight.BOLD),
+            ft.Row(
+                wrap=True,
+                controls=[
+                    ft.ElevatedButton(
+                        code,
+                        on_click=lambda e, lc=code: self._set_language(lc),
+                        style=ft.ButtonStyle(
+                            bgcolor="#444444" if code == self.current_lang_code else None,
+                        ),
+                    )
+                    for code in LANGUAGES
+                ],
+            ),
+        ])
+
+    # ==== Detail Views ==== #
+    def _show_addon_detail(self, report):
+        self.detail_area.controls.clear()
+
+        self.detail_area.controls.extend([
+            ft.Text(report.addon_name, size=16, weight=ft.FontWeight.BOLD),
+            ft.Divider(),
+            ft.Text(f"Manifest: {'✅' if report.has_manifest else '❌'}", size=13),
+            ft.Text(f"Layout: {'✅' if report.has_layout else '❌'}", size=13),
+            ft.Text(f"Valid JSON: {'✅' if not report.invalid_json else '❌'}", size=13),
+        ])
+
+        if report.missing_fields:
+            self.detail_area.controls.append(
+                ft.Text(f"{self.lang['missing_fields']}:", size=13, weight=ft.FontWeight.BOLD)
+            )
+            for field in report.missing_fields:
+                self.detail_area.controls.append(
+                    ft.Text(f"  • {field}", size=12, color="#ff5555")
+                )
+
+        self.page.update()
+
+    def _show_event_detail(self, event):
+        self.detail_area.controls.clear()
+
+        self.detail_area.controls.extend([
+            ft.Text(event.source, size=16, weight=ft.FontWeight.BOLD),
+            ft.Divider(),
+            ft.Text(f"Event ID: {event.event_id}", size=13),
+            ft.Text(f"Level: {event.level}", size=13),
+            ft.Text(f"Date: {event.timestamp.date()}", size=13),
+            ft.Text(f"Time: {event.timestamp.time()}", size=13),
+            ft.Divider(),
+            ft.Text("Message:", size=13, weight=ft.FontWeight.BOLD),
+            ft.Text(event.message, size=12),
+        ])
+
+        self.page.update()
+
+    # ==== Dialog ==== #
+    def _show_text_dialog(self, title: str, content: str):
+        dialog = ft.AlertDialog(
+            title=ft.Text(title),
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[ft.Text(content, size=12, selectable=True)],
+                    scroll=ft.ScrollMode.AUTO,
+                ),
+                width=600,
+                height=400,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Close",
+                    on_click=lambda e: self._close_dialog(dialog),
+                ),
+            ],
+        )
+
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def _close_dialog(self, dialog: ft.AlertDialog):
+        dialog.open = False
+        self.page.update()
+
+    # ==== Theme and Language ==== #
+    def _set_theme(self, theme: str):
+        self.current_theme   = theme
+        self.page.theme_mode = ft.ThemeMode.LIGHT if theme == "light" else ft.ThemeMode.DARK
+        save_settings(self.current_lang_code, self.current_theme)
+        self.page.update()
+
+    def _set_language(self, lang_code: str):
+        self.lang              = LANGUAGES[lang_code]
+        self.current_lang_code = lang_code
+        save_settings(self.current_lang_code, self.current_theme)
+        self._build_ui()
+
+    # ==== Diagnostic Runner ==== #
+    def _run_diagnostic(self):
+        self._switch_tab("tab_addons")
