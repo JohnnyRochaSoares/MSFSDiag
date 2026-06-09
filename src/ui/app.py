@@ -25,8 +25,7 @@ class MSFSDiagApp:
         self.current_theme     = settings["theme"]
         self.lang              = LANGUAGES[self.current_lang_code]
         
-        # Filtro ativo para a lista de Add-ons
-        # Opções: "all", "valid", "invalid", "no_manifest", "no_layout", "invalid_json", "missing_fields"
+        # Filtro ativo para a lista de Add-ons ("all", "valid", "invalid")
         self.current_filter    = "all" 
         
         self.installs          = detect_installations()
@@ -165,45 +164,31 @@ class MSFSDiagApp:
             ft.Text(self.lang["tab_addons"], size=24, weight=ft.FontWeight.BOLD)
         )
         
-        # Grid Avançado de Botões de Filtro (com wrap=True para não quebrar o layout)
+        # Botões de Filtro no topo da aba
         self.content_area.controls.append(
             ft.Row([
                 ft.ElevatedButton(
                     "All",
                     on_click=lambda e: self._set_addon_filter("all"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "all" else None),
+                    style=ft.ButtonStyle(
+                        bgcolor="#444444" if self.current_filter == "all" else None,
+                    ),
                 ),
                 ft.ElevatedButton(
                     "Valid ✅",
                     on_click=lambda e: self._set_addon_filter("valid"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "valid" else None),
+                    style=ft.ButtonStyle(
+                        bgcolor="#444444" if self.current_filter == "valid" else None,
+                    ),
                 ),
                 ft.ElevatedButton(
                     "Invalid ❌",
                     on_click=lambda e: self._set_addon_filter("invalid"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "invalid" else None),
+                    style=ft.ButtonStyle(
+                        bgcolor="#444444" if self.current_filter == "invalid" else None,
+                    ),
                 ),
-                ft.ElevatedButton(
-                    "No Manifest 📄",
-                    on_click=lambda e: self._set_addon_filter("no_manifest"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "no_manifest" else None),
-                ),
-                ft.ElevatedButton(
-                    "No Layout 🗺️",
-                    on_click=lambda e: self._set_addon_filter("no_layout"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "no_layout" else None),
-                ),
-                ft.ElevatedButton(
-                    "Bad JSON ⚙️",
-                    on_click=lambda e: self._set_addon_filter("invalid_json"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "invalid_json" else None),
-                ),
-                ft.ElevatedButton(
-                    "Missing Fields 📝",
-                    on_click=lambda e: self._set_addon_filter("missing_fields"),
-                    style=ft.ButtonStyle(bgcolor="#444444" if self.current_filter == "missing_fields" else None),
-                ),
-            ], spacing=8, wrap=True)
+            ], spacing=8)
         )
 
         self.content_area.controls.append(ft.Divider())
@@ -227,20 +212,11 @@ class MSFSDiagApp:
             is_valid = not report.invalid_json and not report.missing_fields
             status = "✅" if is_valid else "❌"
 
-            # ==== Super Lógica Avançada de Filtragem ====
+            # Lógica de filtragem com base no estado ativo
             if self.current_filter == "valid" and not is_valid:
                 continue
-            elif self.current_filter == "invalid" and is_valid:
+            if self.current_filter == "invalid" and is_valid:
                 continue
-            elif self.current_filter == "no_manifest" and report.has_manifest:
-                continue
-            elif self.current_filter == "no_layout" and report.has_layout:
-                continue
-            elif self.current_filter == "invalid_json" and not report.invalid_json:
-                continue
-            elif self.current_filter == "missing_fields" and not report.missing_fields:
-                continue
-            # ============================================
 
             self.content_area.controls.append(
                 ft.TextButton(
@@ -293,7 +269,7 @@ class MSFSDiagApp:
         self.content_area.controls.append(
             ft.Text(self.lang["tab_symlinks"], size=24, weight=ft.FontWeight.BOLD)
         )
-        self.content_area.append(ft.Divider())
+        self.content_area.controls.append(ft.Divider())
         self.content_area.controls.append(
             ft.Text("Scanning...", size=14, color="#888888")
         )
