@@ -35,7 +35,7 @@ jobs:
       - name: Build executable
         run: |
           cd src
-          pyinstaller --onefile --windowed --name MSFSDiag --icon ../assets/MSFSDiag.ico main.py
+          pyinstaller --onefile --windowed --name MSFSDiag --icon ../assets/MSFSDiag.ico --paths . main.py
 
       # Guarda o executável compilado como um Artefacto no GitHub (útil para testar em commits normais)
       - name: Upload Artifact
