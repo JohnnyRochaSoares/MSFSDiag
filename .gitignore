@@ -1,31 +1,26 @@
-# Cache do Python (ficheiros compilados)
+# ==== Python Cache (Compiled Files) ==== #
 __pycache__/
 *.py[cod]
 *$py.class
+*.spec
 
-# Ambientes Virtuais (Virtual Environments)
+# ==== Virtual Environments ==== #
 venv/
 .venv/
-env/
-ENV/
 build/
 dist/
 
-# Definições Locais do Utilizador
-# Como o teu app.py usa load_settings() e save_settings(), ignora o ficheiro que guarda isso
-# (ajusta o nome abaixo se o teu ficheiro de definições tiver outro nome, ex: config.json)
-settings.json
-
-# Logs do sistema ou da aplicação
+# ==== System or App Logs ==== #
 *.log
 
-# Editores de Código / IDEs
-.vscode/
-.idea/
+# ==== User Settings ==== #
+settings.json
+
+# ==== Code Editors ==== #
 *.swp
 *.swo
 
-# Ficheiros do Sistema Operativo
+# ==== Operative System files ==== #
 Thumbs.db
 Desktop.ini
-.DS_Store 
+.DS_Store

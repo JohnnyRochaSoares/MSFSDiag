@@ -1,4 +1,5 @@
 # ==== Imports ==== #
+import sys
 import threading
 from pathlib import Path
 
@@ -316,16 +317,18 @@ class MSFSDiagApp:
 
     # ==== Settings View ==== #
     def _show_settings(self):
+        import sys
+        base_path       = Path(getattr(sys, "_MEIPASS", Path(__file__).parent.parent.parent))
         readme_content  = ""
         license_content = ""
 
         try:
-            readme_content = (Path(__file__).parent.parent.parent / "README.md").read_text(encoding="utf-8")
+            readme_content = (base_path / "README.md").read_text(encoding="utf-8")
         except OSError:
             readme_content = "README.md not found."
 
         try:
-            license_content = (Path(__file__).parent.parent.parent / "LICENSE").read_text(encoding="utf-8")
+            license_content = (base_path / "LICENSE").read_text(encoding="utf-8")
         except OSError:
             license_content = "LICENSE not found."
 

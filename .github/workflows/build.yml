@@ -8,7 +8,6 @@ on:
     tags:
       - "v*"
 
-# Permissão obrigatória para que o GitHub Actions possa criar Releases e enviar o .exe
 permissions:
   contents: write
 
@@ -28,23 +27,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Instala o requirements se existir, senão avança
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install flet pyinstaller
 
       - name: Build executable
         run: |
           cd src
-          pyinstaller --onefile --windowed --name MSFSDiag --icon ../assets/MSFSDiag.ico --paths . main.py
+          pyinstaller --onefile --windowed --name MSFSDiag --icon ../assets/MSFSDiag.ico --paths . --hidden-import ui.app --hidden-import core.scanner --hidden-import core.analyzer --hidden-import core.manifest_parser --hidden-import core.json_validator --hidden-import os_services.symlinks --hidden-import os_services.event_logs --hidden-import settings --hidden-import config --add-data "../README.md;." --add-data "../LICENSE;." main.py
 
-      # Guarda o executável compilado como um Artefacto no GitHub (útil para testar em commits normais)
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MSFSDiag-Windows-EXE
           path: src/dist/MSFSDiag.exe
 
-      # Cria a Release oficial no GitHub APENAS quando enviares uma Tag (ex: v1.0)
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
