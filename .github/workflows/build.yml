@@ -26,19 +26,19 @@ jobs:
       - name: Build executable
         run: |
           cd src
-          pyinstaller --onefile --windowed --name MSFSDiag \\
-          --icon ../assets/MSFSDiag.ico --paths . \\
-          --hidden-import ui.app \\
-          --hidden-import core.scanner \\
-          --hidden-import core.analyzer \\
-          --hidden-import core.manifest_parser \\
-          --hidden-import core.json_validator \\
-          --hidden-import os_services.symlinks \\
-          --hidden-import os_services.event_logs \\
-          --hidden-import settings \\
-          --hidden-import config \\
-          --collect-all flet --collect-all flet_desktop \\
-          --add-data "../README.md;." --add-data "../LICENSE;." main.py
+          pyinstaller --onefile --windowed --name MSFSDiag \
+            --icon ../assets/MSFSDiag.ico --paths . \
+            --hidden-import ui.app \
+            --hidden-import core.scanner \
+            --hidden-import core.analyzer \
+            --hidden-import core.manifest_parser \
+            --hidden-import core.json_validator \
+            --hidden-import os_services.symlinks \
+            --hidden-import os_services.event_logs \
+            --hidden-import settings \
+            --hidden-import config \
+            --collect-all flet --collect-all flet_desktop \
+            --add-data "../README.md;." --add-data "../LICENSE;." main.py
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
