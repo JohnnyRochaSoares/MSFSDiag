@@ -25,10 +25,7 @@ class MSFSDiagApp:
         self.current_lang_code = settings["language"]
         self.current_theme     = settings["theme"]
         self.lang              = LANGUAGES[self.current_lang_code]
-        
-        # Filtro ativo para a lista de Add-ons ("all", "valid", "invalid")
-        self.current_filter    = "all" 
-        
+        self.current_filter    = "all"
         self.installs          = detect_installations()
         self.install           = self.installs[0] if self.installs else None
 
@@ -128,6 +125,7 @@ class MSFSDiagApp:
     def _switch_tab(self, tab_key: str):
         self.content_area.controls.clear()
         self.detail_area.controls.clear()
+        self.current_filter = "all"
 
         if tab_key == "tab_dashboard":
             self._show_dashboard()
@@ -145,13 +143,11 @@ class MSFSDiagApp:
 
     # ==== Dashboard View ==== #
     def _show_dashboard(self):
-        version   = self.install.version if self.install else self.lang["not_detected"]
         community = str(self.install.community_folder) if self.install and self.install.community_folder else self.lang["not_detected"]
 
         self.content_area.controls.extend([
             ft.Text(self.lang["tab_dashboard"], size=24, weight=ft.FontWeight.BOLD),
             ft.Divider(),
-            ft.Text(f"{self.lang['msfs_version']}: {version}", size=14),
             ft.Text(f"{self.lang['community_path']}: {community}", size=14),
             ft.ElevatedButton(
                 self.lang["run_diagnostic"],
@@ -160,38 +156,50 @@ class MSFSDiagApp:
         ])
 
     # ==== Addons View ==== #
-    def _show_addons(self):
+    def _show_addons(self, filter_key: str = "all"):
+        self.current_filter = filter_key
+
         self.content_area.controls.append(
             ft.Text(self.lang["tab_addons"], size=24, weight=ft.FontWeight.BOLD)
         )
-        
-        # Botões de Filtro no topo da aba
+        self.content_area.controls.append(ft.Divider())
         self.content_area.controls.append(
-            ft.Row([
-                ft.ElevatedButton(
-                    "All",
-                    on_click=lambda e: self._set_addon_filter("all"),
-                    style=ft.ButtonStyle(
-                        bgcolor="#444444" if self.current_filter == "all" else None,
-                    ),
-                ),
-                ft.ElevatedButton(
-                    "Valid ✅",
-                    on_click=lambda e: self._set_addon_filter("valid"),
-                    style=ft.ButtonStyle(
-                        bgcolor="#444444" if self.current_filter == "valid" else None,
-                    ),
-                ),
-                ft.ElevatedButton(
-                    "Invalid ❌",
-                    on_click=lambda e: self._set_addon_filter("invalid"),
-                    style=ft.ButtonStyle(
-                        bgcolor="#444444" if self.current_filter == "invalid" else None,
-                    ),
-                ),
-            ], spacing=8)
+            ft.Text(
+                "⚠️ " + self.lang["addon_warning"] + "⚠️ ",
+                size=30,
+                color="#ffaa00",
+                weight=ft.FontWeight.BOLD,
+            )
         )
+        
+        filters = [
+            ("all",                        "filter_all"),
+            ("ok",                         "filter_ok"),
+            ("errors",                     "filter_errors"),
+            ("no_manifest",                "filter_no_manifest"),
+            ("no_layout",                  "filter_no_layout"),
+            ("invalid_json",               "filter_invalid_json"),
+            ("missing_title",              "filter_missing_title"),
+            ("missing_min_game_version",   "filter_missing_min_game_version"),
+            ("missing_content_type",       "filter_missing_content_type"),
+            ("missing_dependencies",       "filter_missing_dependencies"),
+        ]
 
+        self.content_area.controls.append(
+            ft.Row(
+                wrap=True,
+                controls=[
+                    ft.ElevatedButton(
+                        self.lang[lang_key],
+                        on_click=lambda e, fk=fkey: self._apply_filter(fk),
+                        style=ft.ButtonStyle(
+                            bgcolor="#444444" if fkey == self.current_filter else None,
+                        ),
+                    )
+                    for fkey, lang_key in filters
+                ],
+            )
+        )
         self.content_area.controls.append(ft.Divider())
 
         if not self.install or not self.install.community_folder:
@@ -208,16 +216,35 @@ class MSFSDiagApp:
             )
             return
 
+        shown = 0
         for addon_path in addons:
             report = analyze_addon(addon_path)
-            is_valid = not report.invalid_json and not report.missing_fields
-            status = "✅" if is_valid else "❌"
 
-            # Lógica de filtragem com base no estado ativo
-            if self.current_filter == "valid" and not is_valid:
+            if filter_key == "ok" and (report.invalid_json or report.missing_fields or not report.has_manifest or not report.has_layout):
                 continue
-            if self.current_filter == "invalid" and is_valid:
+            elif filter_key == "errors" and not report.invalid_json and not report.missing_fields and report.has_manifest and report.has_layout:
                 continue
+            elif filter_key == "no_manifest" and report.has_manifest:
+                continue
+            elif filter_key == "no_layout" and report.has_layout:
+                continue
+            elif filter_key == "invalid_json" and not report.invalid_json:
+                continue
+            elif filter_key == "missing_title" and "title" not in report.missing_fields:
+                continue
+            elif filter_key == "missing_manufacturer" and "manufacturer" not in report.missing_fields:
+                continue
+            elif filter_key == "missing_version" and "version" not in report.missing_fields:
+                continue
+            elif filter_key == "missing_min_game_version" and "minimum_game_version" not in report.missing_fields:
+                continue
+            elif filter_key == "missing_content_type" and "content_type" not in report.missing_fields:
+                continue
+            elif filter_key == "missing_dependencies" and "dependencies" not in report.missing_fields:
+                continue
+
+            status = "✅" if not report.invalid_json and not report.missing_fields and report.has_manifest and report.has_layout else "❌"
+            shown += 1
 
             self.content_area.controls.append(
                 ft.TextButton(
@@ -229,14 +256,17 @@ class MSFSDiagApp:
                 )
             )
 
-    # Método para gerir a alteração e atualização dos filtros
-    def _set_addon_filter(self, filter_type: str):
-        self.current_filter = filter_type
+        if shown == 0:
+            self.content_area.controls.append(
+                ft.Text("No add-ons match this filter.", size=14, color="#888888")
+            )
+
+    def _apply_filter(self, filter_key: str):
         self.content_area.controls.clear()
         self.detail_area.controls.clear()
-        self._show_addons()
+        self._show_addons(filter_key)
         self.content_area.update()
-        self.detail_area.update()
+        self.page.update()
 
     # ==== Event Logs View ==== #
     def _show_eventlogs(self):
@@ -259,7 +289,7 @@ class MSFSDiagApp:
                     content=ft.Row([
                         ft.Text(str(event.event_id), size=12, width=60),
                         ft.Text(event.source, size=12, expand=True),
-                        ft.Text(str(event.timestamp.date())),
+                        ft.Text(str(event.timestamp.date()), size=12),
                     ]),
                     on_click=lambda e, ev=event: self._show_event_detail(ev),
                 )
@@ -317,7 +347,6 @@ class MSFSDiagApp:
 
     # ==== Settings View ==== #
     def _show_settings(self):
-        import sys
         base_path       = Path(getattr(sys, "_MEIPASS", Path(__file__).parent.parent.parent))
         readme_content  = ""
         license_content = ""
