@@ -113,11 +113,8 @@
 git clone https://github.com/JohnnyRochaSoares/MSFSDiag.git
 cd MSFSDiag
 pip install -r requirements.txt
-
 cd src
-
 python main.py
-
 ```
 
 
@@ -158,15 +155,15 @@ MSFSDiag/
 
 │   │   ├── analyzer.py
 
-│   │   ├── json\_validator.py
+│   │   ├── json\\\_validator.py
 
-│   │   ├── manifest\_parser.py
+│   │   ├── manifest\\\_parser.py
 
 │   │   └── scanner.py
 
-│   ├── os\_services/
+│   ├── os\\\_services/
 
-│   │   ├── event\_logs.py
+│   │   ├── event\\\_logs.py
 
 │   │   └── symlinks.py
 
@@ -176,12 +173,11 @@ MSFSDiag/
 
 └── tests/
 
-&#x20;   ├── conftest.py
+         ├── conftest.py
 
-&#x20;   ├── test\_analyzer.py
+         ├── test\\\_analyzer.py
 
-&#x20;   └── test\_manifest\_parser.py
-
+         └── test\\\_manifest\\\_parser.py
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
