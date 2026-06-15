@@ -30,21 +30,27 @@ jobs:
           python -m pip install --upgrade pip
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install pyinstaller flet flet-desktop
-
-      - name: Build
+      - name: Build executable
         shell: pwsh
         run: |
           cd src
-          pyinstaller --onefile --windowed --name ATC_Advisor `
+          pyinstaller --onefile --windowed --name MSFSDiag `
+            --icon ../assets/MSFSDiag.ico `
             --paths . `
             --hidden-import ui.app `
-            --hidden-import ui.languages `
-            --hidden-import core.logic `
-            --hidden-import core.distance `
-            --hidden-import core.position `
-            --hidden-import core.settings `
-            --hidden-import integrations.vatsim `
-            --hidden-import integrations.airports `
+            --hidden-import core.scanner `
+            --hidden-import core.analyzer `
+            --hidden-import core.manifest_parser `
+            --hidden-import core.json_validator `
+            --hidden-import os_services.symlinks `
+            --hidden-import os_services.event_logs `
+            --hidden-import settings `
+            --hidden-import config `
+            --collect-all flet `
+            --collect-all flet_desktop `
+            --hidden-import flet_desktop.version `
+            --add-data "../README.md;." `
+            --add-data "../LICENSE;." `
             main.py
 
       - name: Upload Artifact
