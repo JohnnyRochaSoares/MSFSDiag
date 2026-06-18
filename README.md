@@ -130,7 +130,6 @@ python main.py
 
 
 ```
-
 MSFSDiag/
 
 ├── LICENSE
@@ -155,15 +154,15 @@ MSFSDiag/
 
 │   │   ├── analyzer.py
 
-│   │   ├── json\_validator.py
+│   │   ├── json_validator.py
 
-│   │   ├── manifest\_parser.py
+│   │   ├── manifest_parser.py
 
 │   │   └── scanner.py
 
-│   ├── os\_services/
+│   ├── os_services/
 
-│   │   ├── event\_logs.py
+│   │   ├── event_logs.py
 
 │   │   └── symlinks.py
 
@@ -175,9 +174,9 @@ MSFSDiag/
 
          ├── conftest.py
 
-         ├── test\_analyzer.py
+         ├── test_analyzer.py
 
-         └── test\_manifest\_parser.py
+         └── test_manifest_parser.py
 ```
 
 \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
