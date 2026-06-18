@@ -4,7 +4,8 @@ from pathlib import Path
 
 from config import (
     MSFS2020_USER_CFG,
-    MSFS2024_USER_CFG,
+    MSFS2024_USER_CFG_STEAM,
+    MSFS2024_USER_CFG_STORE,
     MANIFEST_FILENAME,
     LAYOUT_FILENAME,
 )
@@ -22,14 +23,20 @@ def detect_installations() -> list[MsfsInstallation]:
 
     if MSFS2020_USER_CFG.exists():
         installations.append(MsfsInstallation(
-            version = "2020",
+            version  = "2020",
             user_cfg = MSFS2020_USER_CFG,
         ))
 
-    if MSFS2024_USER_CFG.exists():
+    # Steam tem prioridade, Store como fallback
+    if MSFS2024_USER_CFG_STEAM.exists():
         installations.append(MsfsInstallation(
-            version = "2024",
-            user_cfg = MSFS2024_USER_CFG,
+            version  = "2024",
+            user_cfg = MSFS2024_USER_CFG_STEAM,
+        ))
+    elif MSFS2024_USER_CFG_STORE.exists():
+        installations.append(MsfsInstallation(
+            version  = "2024",
+            user_cfg = MSFS2024_USER_CFG_STORE,
         ))
 
     return installations
@@ -52,7 +59,7 @@ def find_community_folder(installation: MsfsInstallation) -> Path | None:
 def list_addons(community_folder: Path) -> list[Path]:
     if not community_folder.exists():
         return []
-    
+
     return [
         entry for entry in community_folder.iterdir()
         if entry.is_dir()

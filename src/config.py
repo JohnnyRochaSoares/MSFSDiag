@@ -8,11 +8,13 @@ APP_VERSION = "1.0.0"
 
 # ==== MSFS Paths ==== #
 MSFS2020_APPDATA: Path = Path(os.environ["APPDATA"]) / "Microsoft Flight Simulator"
-MSFS2024_APPDATA: Path = Path(os.environ["APPDATA"]) / "Microsoft Flight Simulator 2024"
+MSFS2024_APPDATA_STEAM: Path = Path(os.environ["APPDATA"]) / "Microsoft Flight Simulator 2024"
+MSFS2024_APPDATA_STORE: Path = Path(os.environ["LOCALAPPDATA"]) / "Packages" / "Microsoft.Limitless_8wekyb3d8bbwe" / "LocalCache"
 
 # ==== Known Configuration Files ==== #
 MSFS2020_USER_CFG: Path = MSFS2020_APPDATA / "UserCfg.opt"
-MSFS2024_USER_CFG: Path = MSFS2024_APPDATA / "UserCfg.opt"
+MSFS2024_USER_CFG_STEAM: Path = MSFS2024_APPDATA_STEAM / "UserCfg.opt"
+MSFS2024_USER_CFG_STORE: Path = MSFS2024_APPDATA_STORE / "UserCfg.opt"
 
 # ==== Add-ons Manifest ==== #
 MANIFEST_FILENAME        = "manifest.json"

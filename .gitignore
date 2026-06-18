@@ -25,5 +25,6 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# ==== Releases ==== #
+# ==== User Compiled files and Installer ==== #
 build/
+installer/
