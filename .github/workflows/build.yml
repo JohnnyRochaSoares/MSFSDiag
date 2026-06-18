@@ -31,6 +31,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
       # Installs the MSVC C++ compiler, required by Flutter to build for Windows
       - name: Set up Visual Studio C++
