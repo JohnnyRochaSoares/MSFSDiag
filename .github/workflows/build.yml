@@ -16,53 +16,62 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # Downloads the repository code onto the GitHub runner machine
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Installs Python 3.11 on the runner
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # Installs Flutter, required by flet build to compile the UI
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # Installs the MSVC C++ compiler, required by Flutter to build for Windows
+      - name: Set up Visual Studio C++
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Installs the Python dependencies listed in requirements.txt
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          if (Test-Path requirements.txt) { pip install -r requirements.txt }
-          pip install pyinstaller flet flet-desktop
-      - name: Build executable
+          pip install -r requirements.txt
+
+      # Compiles the app using flet build, producing the build\windows\ folder
+      - name: Build with Flet
+        shell: pwsh
+        run: flet build windows
+
+      # Installs Inno Setup to create the Windows installer
+      - name: Install Inno Setup
+        shell: pwsh
+        run: winget install -e --id JRSoftware.InnoSetup --silent --accept-package-agreements --accept-source-agreements
+
+      # Runs the Inno Setup compiler to produce MSFSDiag_Setup.exe
+      - name: Build installer
         shell: pwsh
         run: |
-          cd src
-          pyinstaller --onefile --windowed --name MSFSDiag `
-            --icon ../assets/MSFSDiag.ico `
-            --paths . `
-            --hidden-import ui.app `
-            --hidden-import core.scanner `
-            --hidden-import core.analyzer `
-            --hidden-import core.manifest_parser `
-            --hidden-import core.json_validator `
-            --hidden-import os_services.symlinks `
-            --hidden-import os_services.event_logs `
-            --hidden-import settings `
-            --hidden-import config `
-            --collect-all flet `
-            --collect-all flet_desktop `
-            --hidden-import flet_desktop.version `
-            --add-data "../README.md;." `
-            --add-data "../LICENSE;." `
-            main.py
+          $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          & $iscc installer.iss
 
-      - name: Upload Artifact
+      # Saves the installer as a build artifact, useful for testing without a release
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MSFSDiag-Windows-EXE
-          path: src/dist/MSFSDiag.exe
+          name: MSFSDiag-Setup
+          path: installer\MSFSDiag_Setup.exe
 
+      # Publishes the installer to a GitHub Release, only when a v* tag is pushed
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: src/dist/MSFSDiag.exe
+          files: installer\MSFSDiag_Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
