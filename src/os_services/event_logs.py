@@ -1,8 +1,9 @@
 # ==== Imports ==== #
-import win32evtlog
-
+import subprocess
+import json
 from dataclasses import dataclass
 from datetime import datetime
+
 
 # ==== Event Log Entry ==== #
 @dataclass
@@ -13,38 +14,45 @@ class EventLogEntry:
     message:   str
     timestamp: datetime
 
+
 # ==== Event Log Reading ==== #
 def get_msfs_events(max_entries: int = 50) -> list[EventLogEntry]:
-    entries = []
+    # Usa PowerShell para ler os Event Logs sem dependências externas
+    ps_command = f"""
+    Get-EventLog -LogName Application -Newest {max_entries} |
+    Where-Object {{ $_.Source -match 'flight simulator' }} |
+    Select-Object Source, EventID, EntryType, Message, TimeGenerated |
+    ConvertTo-Json -Compress
+    """
 
     try:
-        log = win32evtlog.OpenEventLog(None, "Application")
-    except Exception:
-        return []
-
-    try:
-        events = win32evtlog.ReadEventLog(
-            log,
-            win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ,
-            0,
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_command],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
+        if result.returncode != 0 or not result.stdout.strip():
+            return []
 
-        for event in events:
-            source = event.SourceName
-            if "flight simulator" not in source.lower():
-                continue
+        data = json.loads(result.stdout)
 
+        # PowerShell devolve um objeto em vez de lista se só houver 1 resultado
+        if isinstance(data, dict):
+            data = [data]
+
+        entries = []
+        for item in data:
             entries.append(EventLogEntry(
-                source    = source,
-                event_id  = event.EventID,
-                level     = str(event.EventType),
-                message   = str(event.StringInserts),
-                timestamp = event.TimeGenerated.replace(tzinfo=None),
+                source    = item.get("Source", ""),
+                event_id  = item.get("EventID", 0),
+                level     = str(item.get("EntryType", "")),
+                message   = str(item.get("Message", "")),
+                timestamp = datetime.fromisoformat(item.get("TimeGenerated", "1970-01-01")),
             ))
 
-            if len(entries) >= max_entries:
-                break
-    finally:
-        win32evtlog.CloseEventLog(log)
+        return entries
 
-    return entries
+    except Exception:
+        return []

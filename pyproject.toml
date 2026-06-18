@@ -1,0 +1,5 @@
+[tool.flet]
+module = "src.main"
+
+[tool.flet.python]
+packages = ["pywin32"]
