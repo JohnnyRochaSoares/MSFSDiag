@@ -60,8 +60,11 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-          & $iscc installer.iss
+          $iscc = Get-ChildItem "C:\Users\runneradmin\AppData\Local\Programs\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            $iscc = Get-ChildItem "C:\Program Files*" -Recurse -Filter "ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          & $iscc.FullName installer.iss
 
       # Saves the installer as a build artifact, useful for testing without a release
       - name: Upload artifact
