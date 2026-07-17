@@ -2,6 +2,8 @@
 import sys
 import threading
 from pathlib import Path
+from ai.gemini_client import ask_gemini
+from ai.prompt_builder import build_diagnostic_prompt
 
 import flet as ft
 
@@ -24,6 +26,7 @@ class MSFSDiagApp:
         settings               = load_settings()
         self.current_lang_code = settings["language"]
         self.current_theme     = settings["theme"]
+        self.gemini_api_key    = settings["gemini_api_key"]
         self.lang              = LANGUAGES[self.current_lang_code]
         self.current_filter    = "all"
         self.installs          = detect_installations()
@@ -66,6 +69,7 @@ class MSFSDiagApp:
             ("🧩", "tab_addons"),
             ("📋", "tab_eventlogs"),
             ("🔗", "tab_symlinks"),
+            ("🤖", "tab_ai"),
             ("⚙️", "tab_settings"),
         ]
 
@@ -135,6 +139,8 @@ class MSFSDiagApp:
             self._show_eventlogs()
         elif tab_key == "tab_symlinks":
             self._show_symlinks()
+        elif tab_key == "tab_ai":
+            self._show_ai_tab()
         elif tab_key == "tab_settings":
             self._show_settings()
 
@@ -344,6 +350,74 @@ class MSFSDiagApp:
                 self.page.update()
 
         threading.Thread(target=scan, daemon=True).start()
+
+    # ==== AI View ==== #
+    def _show_ai_tab(self):
+        self.content_area.controls.append(
+            ft.Text(self.lang["tab_ai"], size=24, weight=ft.FontWeight.BOLD)
+        )
+        self.content_area.controls.append(ft.Divider())
+        self.api_key_field = ft.TextField(
+            label="Gemini API Key",
+            value=self.gemini_api_key,
+            password=True,
+            can_reveal_password=True,
+        )
+        self.content_area.controls.append(self.api_key_field)
+        self.content_area.controls.append(
+            ft.ElevatedButton(
+                "Save API Key",
+                on_click=lambda e: self._save_api_key(),
+            )
+        )
+    def _save_api_key(self):
+        self.gemini_api_key = self.api_key_field.value
+        save_settings(self.current_lang_code, self.current_theme, self.gemini_api_key)
+        self.content_area.controls.append(ft.Divider())
+        self.content_area.controls.append(
+            ft.ElevatedButton(
+                "🤖 Run AI Analysis",
+                on_click=lambda e: self._run_ai_analysis(),
+                disabled=not bool(self.gemini_api_key),
+            )
+        )
+    def _run_ai_analysis(self):
+        self.content_area.controls.append(
+            ft.Text("Analyzing... Please wait.", size=14, color="#888888")
+        )
+        self.content_area.update()
+
+    def analyze():
+        addons   = list_addons(self.install.community_folder) if self.install and self.install.community_folder else []
+        reports  = [analyze_addon(a) for a in addons]
+        symlinks = find_broken_symlinks(self.install.community_folder) if self.install and self.install.community_folder else []
+        logs     = get_msfs_events()
+
+        prompt = build_diagnostic_prompt(
+            msfs_version     = self.install.version if self.install else "Unknown",
+            community_folder = self.install.community_folder if self.install else None,
+            addon_reports    = reports,
+            broken_symlinks  = symlinks,
+            event_logs       = logs,
+            language         = self.current_lang_code,
+        )
+
+        result = ask_gemini(prompt, self.gemini_api_key)
+
+        if result.success:
+            self.content_area.controls.append(
+                ft.Text(result.response, size=13, selectable=True)
+            )
+        else:
+            self.content_area.controls.append(
+                ft.Text(f"Error: {result.error}", size=13, color="#ff5555")
+            )
+
+        self.content_area.update()
+        self.page.update()
+
+    threading.Thread(target=analyze, daemon=True).start()
+
 
     # ==== Settings View ==== #
     def _show_settings(self):
