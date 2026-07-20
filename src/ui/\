@@ -403,54 +403,6 @@ class MSFSDiagApp:
         self.content_area.update()
         self.page.update()
 
-    def _send_chat_message(self):
-        message = self.chat_input.value
-        if not message:
-            return
-
-        self.chat_input.value = ""
-        self.chat_input.update()
-
-        self.content_area.controls.append(
-            ft.Text(f"You: {message}", size=13, color="#aaaaaa")
-        )
-        self.content_area.controls.append(
-            ft.Text("Thinking...", size=13, color="#888888")
-        )
-        self.content_area.update()
-
-        def send():
-            self.chat_history.append({
-                "role": "user",
-                "parts": [{"text": message}]
-            })
-
-            result = ask_gemini_chat(self.chat_history, self.gemini_api_key)
-
-            if result.success:
-                self.chat_history.append({
-                    "role": "model",
-                    "parts": [{"text": result.response}]
-                })
-                self.content_area.controls.pop()
-                self.content_area.controls.append(
-                    ft.Markdown(
-                        result.response,
-                        selectable=True,
-                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                    )
-                )
-            else:
-                self.content_area.controls.pop()
-                self.content_area.controls.append(
-                    ft.Text(f"Error: {result.error}", size=13, color="#ff5555")
-                )
-
-            self.content_area.update()
-            self.page.update()
-
-        threading.Thread(target=send, daemon=True).start()
-
     def _run_ai_analysis(self):
         self.content_area.controls.append(
             ft.Text("Analyzing... Please wait.", size=14, color="#888888")
