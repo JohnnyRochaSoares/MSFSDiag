@@ -50,3 +50,30 @@ def ask_gemini(prompt: str, api_key: str, use_flash: bool = False) -> GeminiResu
     except Exception as e:
         return GeminiResult(success=False, response="", error=str(e))
 
+# ==== Chat Function ==== #
+def ask_gemini_chat(history: list[dict], api_key: str, use_flash: bool = False) -> GeminiResult:
+
+    model = GEMINI_FLASH if use_flash else GEMINI_FLASH_LITE
+    url   = API_URL.format(model=model, key=api_key)
+
+    payload = json.dumps({
+        "contents": history
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data    = payload,
+        headers = {"Content-Type": "application/json"},
+        method  = "POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            return GeminiResult(success=True, response=text, error="")
+    except urllib.error.HTTPError as e:
+        return GeminiResult(success=False, response="", error=e.read().decode("utf-8"))
+    except Exception as e:
+        return GeminiResult(success=False, response="", error=str(e))
+
