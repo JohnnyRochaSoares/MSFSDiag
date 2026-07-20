@@ -6,7 +6,7 @@ from pathlib import Path
 # ==== Principal Function ==== #
 def build_diagnostic_prompt(
     msfs_version:     str,
-    community_folder: Path,
+    community_folder: Path | None,
     addon_reports:    list[AddonReport],
     broken_symlinks:  list[Path],
     event_logs:       list[EventLogEntry],

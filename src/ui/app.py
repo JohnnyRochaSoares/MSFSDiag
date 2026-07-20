@@ -370,9 +370,6 @@ class MSFSDiagApp:
                 on_click=lambda e: self._save_api_key(),
             )
         )
-    def _save_api_key(self):
-        self.gemini_api_key = self.api_key_field.value
-        save_settings(self.current_lang_code, self.current_theme, self.gemini_api_key)
         self.content_area.controls.append(ft.Divider())
         self.content_area.controls.append(
             ft.ElevatedButton(
@@ -381,42 +378,49 @@ class MSFSDiagApp:
                 disabled=not bool(self.gemini_api_key),
             )
         )
+
+    def _save_api_key(self):
+        self.gemini_api_key = self.api_key_field.value
+        save_settings(self.current_lang_code, self.current_theme, self.gemini_api_key)
+        self.content_area.update()
+        self.page.update()
+
     def _run_ai_analysis(self):
         self.content_area.controls.append(
             ft.Text("Analyzing... Please wait.", size=14, color="#888888")
         )
         self.content_area.update()
 
-    def analyze():
-        addons   = list_addons(self.install.community_folder) if self.install and self.install.community_folder else []
-        reports  = [analyze_addon(a) for a in addons]
-        symlinks = find_broken_symlinks(self.install.community_folder) if self.install and self.install.community_folder else []
-        logs     = get_msfs_events()
+        def analyze():
+            addons   = list_addons(self.install.community_folder) if self.install and self.install.community_folder else []
+            reports  = [analyze_addon(a) for a in addons]
+            symlinks = find_broken_symlinks(self.install.community_folder) if self.install and self.install.community_folder else []
+            logs     = get_msfs_events()
 
-        prompt = build_diagnostic_prompt(
-            msfs_version     = self.install.version if self.install else "Unknown",
-            community_folder = self.install.community_folder if self.install else None,
-            addon_reports    = reports,
-            broken_symlinks  = symlinks,
-            event_logs       = logs,
-            language         = self.current_lang_code,
-        )
-
-        result = ask_gemini(prompt, self.gemini_api_key)
-
-        if result.success:
-            self.content_area.controls.append(
-                ft.Text(result.response, size=13, selectable=True)
-            )
-        else:
-            self.content_area.controls.append(
-                ft.Text(f"Error: {result.error}", size=13, color="#ff5555")
+            prompt = build_diagnostic_prompt(
+                msfs_version     = self.install.version if self.install else "Unknown",
+                community_folder = self.install.community_folder if self.install else None,
+                addon_reports    = reports,
+                broken_symlinks  = symlinks,
+                event_logs       = logs,
+                language         = self.current_lang_code,
             )
 
-        self.content_area.update()
-        self.page.update()
+            result = ask_gemini(prompt, self.gemini_api_key)
 
-    threading.Thread(target=analyze, daemon=True).start()
+            if result.success:
+                self.content_area.controls.append(
+                    ft.Text(result.response, size=13, selectable=True)
+                )
+            else:
+                self.content_area.controls.append(
+                    ft.Text(f"Error: {result.error}", size=13, color="#ff5555")
+                )
+
+            self.content_area.update()
+            self.page.update()
+
+        threading.Thread(target=analyze, daemon=True).start()
 
 
     # ==== Settings View ==== #
