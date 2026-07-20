@@ -322,7 +322,8 @@ class MSFSDiagApp:
 
         def scan():
             try:
-                broken = find_broken_symlinks(self.install.community_folder)
+                cf = self.install.community_folder if self.install else None
+                broken = find_broken_symlinks(cf) if cf else []
                 self.content_area.controls.clear()
                 self.content_area.controls.append(
                     ft.Text(self.lang["tab_symlinks"], size=24, weight=ft.FontWeight.BOLD)
@@ -392,9 +393,10 @@ class MSFSDiagApp:
         self.content_area.update()
 
         def analyze():
-            addons   = list_addons(self.install.community_folder) if self.install and self.install.community_folder else []
+            cf       = self.install.community_folder if self.install else None
+            addons   = list_addons(cf) if cf else []
             reports  = [analyze_addon(a) for a in addons]
-            symlinks = find_broken_symlinks(self.install.community_folder) if self.install and self.install.community_folder else []
+            symlinks = find_broken_symlinks(cf) if cf else []
             logs     = get_msfs_events()
 
             prompt = build_diagnostic_prompt(
@@ -410,7 +412,11 @@ class MSFSDiagApp:
 
             if result.success:
                 self.content_area.controls.append(
-                    ft.Text(result.response, size=13, selectable=True)
+                    ft.Markdown(
+                        result.response,
+                        selectable=True,
+                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                    )
                 )
             else:
                 self.content_area.controls.append(
@@ -421,7 +427,6 @@ class MSFSDiagApp:
             self.page.update()
 
         threading.Thread(target=analyze, daemon=True).start()
-
 
     # ==== Settings View ==== #
     def _show_settings(self):
